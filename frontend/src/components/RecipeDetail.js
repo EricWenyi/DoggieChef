@@ -30,7 +30,7 @@ const RecipeDetail = () => {
     if (window.confirm('Are you sure you want to delete this recipe?')) {
       try {
         await axios.delete(`/api/recipes/${id}`);
-        navigate('/');
+        navigate('/recipes');
       } catch (error) {
         console.error('Error deleting recipe:', error);
         alert('Error deleting recipe');
@@ -52,7 +52,7 @@ const RecipeDetail = () => {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/recipes')}
             className="btn btn-secondary"
             style={{ marginRight: '1rem' }}
           >

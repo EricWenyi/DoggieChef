@@ -80,10 +80,25 @@ const RecipeForm = () => {
     setLoading(true);
 
     try {
+      // Enhanced debugging
       console.log('🚀 Starting recipe submission...');
       console.log('📝 Form data:', formData);
       console.log('📸 Photos to upload:', photos);
       console.log('🔄 Is editing:', isEditing);
+      
+      // Validate required fields
+      if (!formData.title || !formData.country || !formData.protein_type) {
+        const missingFields = [];
+        if (!formData.title) missingFields.push('Title');
+        if (!formData.country) missingFields.push('Country');
+        if (!formData.protein_type) missingFields.push('Protein Type');
+        
+        const errorMessage = `Please fill in the required fields: ${missingFields.join(', ')}`;
+        console.error('❌ Validation Error:', errorMessage);
+        alert(errorMessage);
+        setLoading(false);
+        return;
+      }
       
       const formDataToSend = new FormData();
       
@@ -100,6 +115,12 @@ const RecipeForm = () => {
         console.log(`📸 Adding photo ${index}:`, photo.name, photo.size, 'bytes');
         formDataToSend.append('photos', photo);
       });
+
+      // Log what's being sent
+      console.log('📦 FormData contents:');
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(`  ${key}:`, value);
+      }
 
       console.log('🌐 Sending request to:', isEditing ? `/api/recipes/${id}` : '/api/recipes');
       
@@ -122,7 +143,7 @@ const RecipeForm = () => {
         alert('Recipe created successfully!');
       }
 
-      navigate('/');
+      navigate('/recipes');
     } catch (error) {
       console.error('❌ Error saving recipe:', error);
       console.error('❌ Error response:', error.response?.data);
@@ -136,6 +157,17 @@ const RecipeForm = () => {
         } else if (error.response.data.message) {
           errorMessage += ': ' + error.response.data.message;
         }
+      } else if (error.message) {
+        errorMessage += ': ' + error.message;
+      }
+      
+      // More detailed error reporting
+      if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error - please check if the server is running';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'API endpoint not found - please check server configuration';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error - please try again or check the server logs';
       }
       
       alert(errorMessage);
@@ -152,7 +184,7 @@ const RecipeForm = () => {
     <div className="form-container">
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/recipes')}
           className="btn btn-secondary"
           style={{ marginRight: '1rem' }}
         >
@@ -162,9 +194,24 @@ const RecipeForm = () => {
         <h2>{isEditing ? 'Edit Recipe' : 'Add New Recipe'}</h2>
       </div>
 
+      {!isEditing && (
+        <div style={{ 
+          background: 'var(--dark-black)', 
+          padding: '1rem', 
+          borderRadius: 'var(--border-radius)', 
+          marginBottom: '2rem',
+          border: '1px solid var(--accent-gray)'
+        }}>
+          <p style={{ color: 'var(--text-gray)', margin: 0 }}>
+            📝 Fill in the required fields marked with <span style={{ color: 'red' }}>*</span> to add your recipe. 
+            The Title, Country, and Protein Type are mandatory.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label className="form-label">Recipe Title *</label>
+          <label className="form-label">Recipe Title <span style={{ color: 'red' }}>*</span></label>
           <input
             type="text"
             name="title"
@@ -173,6 +220,10 @@ const RecipeForm = () => {
             className="form-input"
             required
             placeholder="Enter recipe title"
+            style={{ 
+              borderColor: formData.title ? 'var(--accent-gray)' : 'var(--primary-orange)',
+              borderWidth: formData.title ? '2px' : '2px'
+            }}
           />
         </div>
 
@@ -189,7 +240,7 @@ const RecipeForm = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div className="form-group">
-            <label className="form-label">Country of Origin *</label>
+            <label className="form-label">Country of Origin <span style={{ color: 'red' }}>*</span></label>
             <input
               type="text"
               name="country"
@@ -198,17 +249,25 @@ const RecipeForm = () => {
               className="form-input"
               required
               placeholder="e.g., China, Italy, Japan"
+              style={{ 
+                borderColor: formData.country ? 'var(--accent-gray)' : 'var(--primary-orange)',
+                borderWidth: formData.country ? '2px' : '2px'
+              }}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Protein Type *</label>
+            <label className="form-label">Protein Type <span style={{ color: 'red' }}>*</span></label>
             <select
               name="protein_type"
               value={formData.protein_type}
               onChange={handleInputChange}
               className="form-select"
               required
+              style={{ 
+                borderColor: formData.protein_type ? 'var(--accent-gray)' : 'var(--primary-orange)',
+                borderWidth: formData.protein_type ? '2px' : '2px'
+              }}
             >
               <option value="">Select protein type</option>
               <option value="Beef">Beef</option>
@@ -373,7 +432,7 @@ const RecipeForm = () => {
           
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/recipes')}
             className="btn btn-secondary"
           >
             Cancel
