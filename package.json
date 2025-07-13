@@ -1,0 +1,13 @@
+{
+  "name": "doggiechef",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm start",
+    "install-deps": "cd frontend && npm install"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+} 
