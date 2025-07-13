@@ -80,32 +80,65 @@ const RecipeForm = () => {
     setLoading(true);
 
     try {
+      console.log('🚀 Starting recipe submission...');
+      console.log('📝 Form data:', formData);
+      console.log('📸 Photos to upload:', photos);
+      console.log('🔄 Is editing:', isEditing);
+      
       const formDataToSend = new FormData();
       
       // Add form fields
       Object.keys(formData).forEach(key => {
         if (formData[key]) {
+          console.log(`📋 Adding field ${key}:`, formData[key]);
           formDataToSend.append(key, formData[key]);
         }
       });
 
       // Add new photos
-      photos.forEach(photo => {
+      photos.forEach((photo, index) => {
+        console.log(`📸 Adding photo ${index}:`, photo.name, photo.size, 'bytes');
         formDataToSend.append('photos', photo);
       });
 
+      console.log('🌐 Sending request to:', isEditing ? `/api/recipes/${id}` : '/api/recipes');
+      
+      let response;
       if (isEditing) {
-        await axios.put(`/api/recipes/${id}`, formDataToSend);
+        response = await axios.put(`/api/recipes/${id}`, formDataToSend, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        console.log('✅ Update response:', response.data);
         alert('Recipe updated successfully!');
       } else {
-        await axios.post('/api/recipes', formDataToSend);
+        response = await axios.post('/api/recipes', formDataToSend, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        console.log('✅ Create response:', response.data);
         alert('Recipe created successfully!');
       }
 
       navigate('/');
     } catch (error) {
-      console.error('Error saving recipe:', error);
-      alert('Error saving recipe');
+      console.error('❌ Error saving recipe:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error headers:', error.response?.headers);
+      
+      let errorMessage = 'Error saving recipe';
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage += ': ' + error.response.data;
+        } else if (error.response.data.message) {
+          errorMessage += ': ' + error.response.data.message;
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }

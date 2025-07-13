@@ -6,6 +6,8 @@ import uuid
 from urllib.parse import urlparse, parse_qs
 import cloudinary
 import cloudinary.uploader
+import cgi
+import io
 
 # Configure Cloudinary
 cloudinary.config(
@@ -69,30 +71,106 @@ class handler(BaseHTTPRequestHandler):
     
     def do_POST(self):
         try:
+            print('🚀 POST request received')
+            print('📋 Headers:', dict(self.headers))
+            
             # Initialize database
             self.init_db()
             
-            # Parse form data (simplified for now)
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
+            content_type = self.headers.get('Content-Type', '')
+            content_length = int(self.headers.get('Content-Length', 0))
             
-            # For now, assume JSON data
-            data = json.loads(post_data.decode('utf-8'))
+            print(f'📦 Content-Type: {content_type}')
+            print(f'📏 Content-Length: {content_length}')
+            
+            if content_length == 0:
+                print('❌ No content received')
+                self.send_error(400, 'No content received')
+                return
+            
+            post_data = self.rfile.read(content_length)
+            print(f'📥 Raw data length: {len(post_data)}')
+            
+            # Handle different content types
+            if 'multipart/form-data' in content_type:
+                print('📋 Processing multipart form data')
+                try:
+                    # Parse multipart form data
+                    form = cgi.FieldStorage(
+                        fp=io.BytesIO(post_data),
+                        headers=self.headers,
+                        environ={'REQUEST_METHOD': 'POST'}
+                    )
+                    
+                    # Extract form fields
+                    data = {}
+                    photos = []
+                    
+                    for field_name in form.keys():
+                        field = form[field_name]
+                        if field.filename:  # It's a file
+                            photos.append({
+                                'filename': field.filename,
+                                'data': field.file.read()
+                            })
+                            print(f'📸 Found photo: {field.filename}')
+                        else:  # It's a regular field
+                            data[field_name] = field.value
+                            print(f'📋 Found field {field_name}: {field.value}')
+                    
+                    print(f'📝 Extracted data: {data}')
+                    print(f'📸 Found {len(photos)} photos')
+                    
+                except Exception as e:
+                    print(f'❌ Failed to parse multipart data: {e}')
+                    self.send_error(400, f'Invalid multipart data format: {e}')
+                    return
+            else:
+                print('📋 Processing JSON data')
+                try:
+                    data = json.loads(post_data.decode('utf-8'))
+                    photos = []
+                except json.JSONDecodeError as e:
+                    print(f'❌ JSON decode error: {e}')
+                    self.send_error(400, f'Invalid JSON: {e}')
+                    return
+            
+            print(f'📝 Parsed data: {data}')
             
             # Validate required fields
-            if not data.get('title'):
-                self.send_error(400, 'Title is required')
-                return
-            if not data.get('country'):
-                self.send_error(400, 'Country is required')
-                return
-            if not data.get('protein_type'):
-                self.send_error(400, 'Protein type is required')
-                return
+            required_fields = ['title', 'country', 'protein_type']
+            for field in required_fields:
+                if not data.get(field):
+                    error_msg = f'{field} is required'
+                    print(f'❌ Validation error: {error_msg}')
+                    self.send_error(400, error_msg)
+                    return
+            
+            print('✅ Validation passed')
             
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
+            # Upload photos to Cloudinary
+            photo_urls = []
+            for i, photo in enumerate(photos):
+                try:
+                    print(f'📸 Uploading photo {i+1}/{len(photos)}: {photo["filename"]}')
+                    result = cloudinary.uploader.upload(
+                        photo['data'],
+                        folder='recipes',
+                        public_id=f'recipe_{uuid.uuid4()}'
+                    )
+                    photo_urls.append(result['secure_url'])
+                    print(f'✅ Photo uploaded: {result["secure_url"]}')
+                except Exception as e:
+                    print(f'❌ Photo upload failed: {e}')
+                    # Continue with other photos
+            
+            photos_json = json.dumps(photo_urls)
+            print(f'📸 Photos JSON: {photos_json}')
+            
+            print('💾 Inserting into database...')
             cursor.execute('''
                 INSERT INTO recipes (title, description, country, protein_type, cooking_time, difficulty, ingredients, photos)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -104,12 +182,14 @@ class handler(BaseHTTPRequestHandler):
                 int(data.get('cooking_time')) if data.get('cooking_time') else None,
                 data.get('difficulty'),
                 data.get('ingredients'),
-                ''  # Photos will be handled separately
+                photos_json
             ))
             
             recipe_id = cursor.lastrowid
             conn.commit()
             conn.close()
+            
+            print(f'✅ Recipe created with ID: {recipe_id}')
             
             result = {'id': recipe_id, 'message': 'Recipe created successfully'}
             
@@ -120,6 +200,9 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(result).encode())
             
         except Exception as e:
+            print(f'❌ Server error: {e}')
+            import traceback
+            traceback.print_exc()
             self.send_error(500, str(e))
     
     def do_OPTIONS(self):
