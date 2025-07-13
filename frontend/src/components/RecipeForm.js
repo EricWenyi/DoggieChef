@@ -23,12 +23,6 @@ const RecipeForm = () => {
   const [loading, setLoading] = useState(false);
   const [loadingRecipe, setLoadingRecipe] = useState(isEditing);
 
-  useEffect(() => {
-    if (isEditing) {
-      fetchRecipe();
-    }
-  }, [id]);
-
   const fetchRecipe = async () => {
     try {
       const response = await axios.get(`/api/recipes/${id}`);
@@ -52,6 +46,13 @@ const RecipeForm = () => {
       setLoadingRecipe(false);
     }
   };
+
+  useEffect(() => {
+    if (isEditing) {
+      fetchRecipe();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isEditing]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

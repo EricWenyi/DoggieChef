@@ -10,15 +10,6 @@ const RecipeList = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchFilters();
-    fetchRecipes();
-  }, []);
-
-  useEffect(() => {
-    fetchRecipes();
-  }, [filters]);
-
   const fetchFilters = async () => {
     try {
       const response = await axios.get('/api/filters');
@@ -27,6 +18,17 @@ const RecipeList = () => {
       console.error('Error fetching filters:', error);
     }
   };
+
+  useEffect(() => {
+    fetchFilters();
+    fetchRecipes();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetchRecipes();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const fetchRecipes = async () => {
     try {

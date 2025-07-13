@@ -9,10 +9,6 @@ const RecipeDetail = () => {
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchRecipe();
-  }, [id]);
-
   const fetchRecipe = async () => {
     try {
       const response = await axios.get(`/api/recipes/${id}`);
@@ -24,6 +20,11 @@ const RecipeDetail = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRecipe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this recipe?')) {
@@ -92,7 +93,7 @@ const RecipeDetail = () => {
               <img 
                 key={index}
                 src={photo} 
-                alt={`${recipe.title} - Photo ${index + 1}`}
+                alt={`${recipe.title} recipe step ${index + 1}`}
               />
             ))}
           </div>
