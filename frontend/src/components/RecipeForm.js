@@ -3,6 +3,55 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, X, Save, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
+// Vercel-friendly logging utility
+const log = {
+  info: (message, data = {}) => {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'INFO',
+      message,
+      data,
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    console.log('🔍 [DoggieChef]', JSON.stringify(logEntry));
+  },
+  error: (message, error = {}, data = {}) => {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'ERROR',
+      message,
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        response: error.response ? {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        } : undefined
+      },
+      data,
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    console.error('❌ [DoggieChef]', JSON.stringify(logEntry));
+  },
+  debug: (message, data = {}) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🐛 [DoggieChef Debug]', message, data);
+    }
+  }
+};
+
+// Configure axios for development
+if (process.env.NODE_ENV === 'development') {
+  axios.defaults.baseURL = '';
+  axios.defaults.timeout = 10000;
+  log.info('Axios configured for development mode');
+}
+
 const RecipeForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,11 +129,20 @@ const RecipeForm = () => {
     setLoading(true);
 
     try {
-      // Enhanced debugging
-      console.log('🚀 Starting recipe submission...');
-      console.log('📝 Form data:', formData);
-      console.log('📸 Photos to upload:', photos);
-      console.log('🔄 Is editing:', isEditing);
+      log.info('Recipe submission started', {
+        isEditing,
+        formData: {
+          title: formData.title,
+          country: formData.country,
+          protein_type: formData.protein_type,
+          hasDescription: !!formData.description,
+          hasCookingTime: !!formData.cooking_time,
+          hasDifficulty: !!formData.difficulty,
+          hasIngredients: !!formData.ingredients
+        },
+        photoCount: photos.length,
+        existingPhotoCount: existingPhotos.length
+      });
       
       // Validate required fields
       if (!formData.title || !formData.country || !formData.protein_type) {
@@ -94,7 +152,14 @@ const RecipeForm = () => {
         if (!formData.protein_type) missingFields.push('Protein Type');
         
         const errorMessage = `Please fill in the required fields: ${missingFields.join(', ')}`;
-        console.error('❌ Validation Error:', errorMessage);
+        log.error('Validation failed - missing required fields', new Error(errorMessage), {
+          missingFields,
+          formData: {
+            title: formData.title,
+            country: formData.country,
+            protein_type: formData.protein_type
+          }
+        });
         alert(errorMessage);
         setLoading(false);
         return;
@@ -105,24 +170,37 @@ const RecipeForm = () => {
       // Add form fields
       Object.keys(formData).forEach(key => {
         if (formData[key]) {
-          console.log(`📋 Adding field ${key}:`, formData[key]);
+          log.debug(`Adding form field ${key}`, { value: formData[key] });
           formDataToSend.append(key, formData[key]);
         }
       });
 
       // Add new photos
       photos.forEach((photo, index) => {
-        console.log(`📸 Adding photo ${index}:`, photo.name, photo.size, 'bytes');
+        log.debug(`Adding photo ${index}`, { 
+          name: photo.name, 
+          size: photo.size, 
+          type: photo.type 
+        });
         formDataToSend.append('photos', photo);
       });
 
-      // Log what's being sent
-      console.log('📦 FormData contents:');
-      for (let [key, value] of formDataToSend.entries()) {
-        console.log(`  ${key}:`, value);
+      // Log what's being sent (for development only)
+      if (process.env.NODE_ENV === 'development') {
+        log.debug('FormData contents prepared', {
+          fieldCount: Array.from(formDataToSend.keys()).length,
+          fields: Array.from(formDataToSend.keys())
+        });
       }
 
-      console.log('🌐 Sending request to:', isEditing ? `/api/recipes/${id}` : '/api/recipes');
+      const requestUrl = isEditing ? `/api/recipes/${id}` : '/api/recipes';
+      log.info('Sending API request', {
+        method: isEditing ? 'PUT' : 'POST',
+        url: requestUrl,
+        fullUrl: window.location.origin + requestUrl,
+        isEditing,
+        recipeId: id
+      });
       
       let response;
       if (isEditing) {
@@ -131,7 +209,11 @@ const RecipeForm = () => {
             'Content-Type': 'multipart/form-data'
           }
         });
-        console.log('✅ Update response:', response.data);
+        log.info('Recipe update successful', {
+          recipeId: id,
+          responseData: response.data,
+          status: response.status
+        });
         alert('Recipe updated successfully!');
       } else {
         response = await axios.post('/api/recipes', formDataToSend, {
@@ -139,16 +221,27 @@ const RecipeForm = () => {
             'Content-Type': 'multipart/form-data'
           }
         });
-        console.log('✅ Create response:', response.data);
+        log.info('Recipe creation successful', {
+          responseData: response.data,
+          status: response.status,
+          newRecipeId: response.data.id
+        });
         alert('Recipe created successfully!');
       }
 
       navigate('/recipes');
     } catch (error) {
-      console.error('❌ Error saving recipe:', error);
-      console.error('❌ Error response:', error.response?.data);
-      console.error('❌ Error status:', error.response?.status);
-      console.error('❌ Error headers:', error.response?.headers);
+      log.error('Recipe submission failed', error, {
+        isEditing,
+        recipeId: id,
+        formData: {
+          title: formData.title,
+          country: formData.country,
+          protein_type: formData.protein_type
+        },
+        photoCount: photos.length,
+        requestUrl: isEditing ? `/api/recipes/${id}` : '/api/recipes'
+      });
       
       let errorMessage = 'Error saving recipe';
       if (error.response?.data) {
@@ -163,11 +256,16 @@ const RecipeForm = () => {
       
       // More detailed error reporting
       if (error.code === 'NETWORK_ERROR') {
-        errorMessage = 'Network error - please check if the server is running';
+        errorMessage = 'Network error - please check your connection';
+        log.error('Network error detected', error);
       } else if (error.response?.status === 404) {
-        errorMessage = 'API endpoint not found - please check server configuration';
+        errorMessage = 'API endpoint not found - please try refreshing the page';
+        log.error('404 error - endpoint not found', error, {
+          requestedUrl: isEditing ? `/api/recipes/${id}` : '/api/recipes'
+        });
       } else if (error.response?.status === 500) {
-        errorMessage = 'Server error - please try again or check the server logs';
+        errorMessage = 'Server error - please try again in a moment';
+        log.error('500 error - server error', error);
       }
       
       alert(errorMessage);
@@ -428,6 +526,36 @@ const RecipeForm = () => {
           >
             <Save size={16} />
             {loading ? 'Saving...' : (isEditing ? 'Update Recipe' : 'Create Recipe')}
+          </button>
+          
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                log.info('API connection test started', {
+                  testUrl: '/api/recipes',
+                  timestamp: new Date().toISOString()
+                });
+                const response = await axios.get('/api/recipes');
+                const recipeCount = response.data.length;
+                log.info('API connection test successful', {
+                  recipeCount,
+                  responseStatus: response.status,
+                  responseTime: new Date().toISOString()
+                });
+                alert(`API test successful! Found ${recipeCount} recipes.`);
+              } catch (error) {
+                log.error('API connection test failed', error, {
+                  testUrl: '/api/recipes',
+                  timestamp: new Date().toISOString()
+                });
+                alert('API test failed: ' + error.message);
+              }
+            }}
+            className="btn btn-secondary"
+            style={{ backgroundColor: 'var(--accent-gray)' }}
+          >
+            Test API
           </button>
           
           <button
